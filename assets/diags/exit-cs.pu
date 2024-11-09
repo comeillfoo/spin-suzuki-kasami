@@ -1,0 +1,22 @@
+@startuml
+
+title "Алгоритм при выходе из КС"
+
+start
+
+:присвоить элементу LN[i]\nмассива из маркера значение RN_i[i]\n<math>LN[i] = RN_i[i]</math>;
+:j = 1;
+repeat
+if (<math>j \ne i, j \notin Q, RN_i[j] = LN[j] + 1?</math>) then
+  :поставить j в очередь Q;
+endif
+repeat while (<math>j \le N?</math>) is (j = j + 1)
+
+if (Q не пусто?) then
+  :взять идентификатор процесса из очереди Q;
+  :послать маркеру процессу;
+endif
+
+stop
+
+@enduml

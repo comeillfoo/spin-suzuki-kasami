@@ -1,0 +1,20 @@
+@startuml
+
+title "Алгоритм обмена при запросе в КС"
+
+participant "<math>P_i</math>" as Pi
+participant "<math>P_j</math>" as Pj
+
+alt у i-процесса нету маркера
+
+Pi -> Pi : увеличить на 1\nномер запросов RN_i[i]
+Pi -> Pj : REQUEST(i, RN_i[i])
+
+  alt у j-процесса есть маркер
+    Pj -> Pj : присвоить RN_j[i] максимум\nмежду старым и RN_i[i]
+    Pj --> Pi : отослать маркер
+  else у j-процесса нету маркера
+    Pj -> Pj : присвоить RN_j[i] максимум\nмежду старым и RN_i[i]
+  end
+end
+@enduml
