@@ -1,2 +1,4 @@
 # spin-suzuki-kasami
-Verificion of Suzuki-Kasami algorithm with Spin Model Checker
+
+Verification of Suzuki-Kasami algorithm with Spin Model Checker.
+
