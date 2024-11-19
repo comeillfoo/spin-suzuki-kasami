@@ -17,71 +17,86 @@ typedef MARKER {
     int LN[N]
 }
 
-chan requests [N] = [0] of { byte, int, chan };
+mtype = { request, marker };
+chan ports [N] = [N] of { mtype, byte, int, chan };
+// request(sender, n, _), where sender - sender's pid (j), n - RN_j[j]
+// marker(_, _, mbuf), where mbuf - buffer with the marker
 
-inline request_CS(marker, RN, ireply, jreply) {
+inline pass_marker(port, token, mbuf) {
+    mbuf ! token;
+    ports[port] ! marker(0, 0, mbuf)
+}
+
+inline request_CS(token, mbuf, RN) {
     byte j;
     int n;
+    mtype ingress_mtype;
     if
-    :: ! marker.owns ->
+    :: ! token.owns ->
         RN[_pid]++;
-        for(_i, 0, N)
+        for(other_pid, 0, N)
             if
-            :: _i != _pid -> requests[_i] ! _pid, RN[_pid], ireply
+            :: other_pid != _pid -> ports[other_pid] ! request(_pid, RN[_pid], 0)
             fi;
-        rof(_i)
+        rof(other_pid)
     fi;
-    requests[_pid] ? j, n, jreply;
-    RN[j] = (RN[j] > n -> RN[j] : n);
+    ports[_pid] ?? ingress_mtype, j, n, mbuf;
     if
-    :: marker.owns && RN[j] == marker.LN[j] + 1 -> jreply ! marker
+    :: ingress_mtype == marker -> mbuf ? token
+    :: ingress_mtype == request ->
+       RN[j] = (RN[j] > n -> RN[j] : n);
+       if
+       :: token.owns && RN[j] == token.LN[j] + 1 -> pass_marker(j, token, mbuf)
+       fi
     fi
 }
 
-inline enter_CS(marker, cs_count) {
+inline enter_CS(token, cs_count) {
     if
-    :: marker.owns -> atomic { cs_count++ }
+    :: token.owns -> atomic { cs_count++ }
     fi
 }
 
-inline exit_CS(marker, Q, RN) {
+inline exit_CS(token, mbuf, RN, Q) {
     byte next_pid;
     if
-    :: marker.owns ->
-        marker.LN[_pid] = RN[_pid];
-        // TODO: add only pids that are not presented in Q
-        for (_i, 0, N)
-            if
-            :: RN[_i] == marker.LN[_i] + 1 -> Q ! _i
-            fi;
-        rof(_i);
-        if
-        :: nempty(Q) ->
-            Q ? next_pid;
-            // TODO: pass token to next pid
-        fi
+    :: token.owns ->
+       token.LN[_pid] = RN[_pid];
+       // TODO: add only pids that are not presented in Q
+       for (enqueue_pid, 0, N)
+          if
+          :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 -> Q ! enqueue_pid
+          fi;
+       rof(enqueue_pid);
+       if
+       :: nempty(Q) ->
+          Q ? next_pid;
+          pass_marker(next_pid, token, mbuf)
+       fi
     fi
 }
 
 proctype P(bool owns) {
-    chan ireply = [0] of { MARKER };
-    chan jreply = [0] of { MARKER };
+    chan mbuf = [1] of { MARKER };
     int cs_count = 0;
     int RN[N]; // local sequence numbers of last request
     chan Q = [N] of { byte }; // processes queue
-    MARKER marker;
-    marker.owns = owns;
+    MARKER token;
+    token.owns = owns;
     for(i, 0, N)
-        marker.LN[i] = 0;
+        token.LN[i] = 0;
         RN[i] = 0;
     rof(i);
+end:
     do
-    :: request_CS(marker, RN, ireply, jreply); enter_CS(marker, cs_count); exit_CS(marker, Q, RN)
+    :: request_CS(token, mbuf, RN);
+       enter_CS(token, cs_count);
+       exit_CS(token, mbuf, RN, Q)
     od
 }
 
 init {
-    run P(true)
     run P(false);
+    run P(true)
 }
 
