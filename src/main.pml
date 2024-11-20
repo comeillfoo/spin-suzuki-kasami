@@ -9,6 +9,9 @@
        it++ \
     od
 
+// channel placeholder
+#define SENTINEL_CHAN (-1)
+
 // Number of nodes
 #define N (2)
 
@@ -36,11 +39,11 @@ inline request_CS(token, mbuf, RN) {
         RN[_pid]++;
         for(other_pid, 0, N)
             if
-            :: other_pid != _pid -> ports[other_pid] ! request(_pid, RN[_pid], 0)
+            :: other_pid != _pid -> ports[other_pid] ! request(_pid, RN[_pid], SENTINEL_CHAN)
             fi;
         rof(other_pid)
     fi;
-    ports[_pid] ?? ingress_mtype, j, n, mbuf;
+    ports[_pid] ? ingress_mtype, j, n, mbuf;
     if
     :: ingress_mtype == marker -> mbuf ? token
     :: ingress_mtype == request ->
@@ -62,10 +65,14 @@ inline exit_CS(token, mbuf, RN, Q) {
     if
     :: token.owns ->
        token.LN[_pid] = RN[_pid];
-       // TODO: add only pids that are not presented in Q
        for (enqueue_pid, 0, N)
-          if
-          :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 -> Q ! enqueue_pid
+          if // random polling (typed [] for using as guard, usually <>)
+          :: (Q ?? [eval(enqueue_pid)]) -> skip
+          :: else ->
+             if
+             :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
+                Q ! enqueue_pid
+             fi
           fi;
        rof(enqueue_pid);
        if
@@ -87,7 +94,6 @@ proctype P(bool owns) {
         token.LN[i] = 0;
         RN[i] = 0;
     rof(i);
-end:
     do
     :: request_CS(token, mbuf, RN);
        enter_CS(token, cs_count);
