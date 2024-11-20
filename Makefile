@@ -21,6 +21,6 @@ $(BUILDDIR):
 
 clean:
 	rm -rf $(BUILDDIR)
-	rm -f pan
+	rm -f pan *.pml.trail
 
 .PHONY: clean help

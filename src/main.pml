@@ -9,100 +9,104 @@
        it++ \
     od
 
-// channel placeholder
-#define SENTINEL_CHAN (-1)
-
 // Number of nodes
 #define N (2)
+#define DEFAULT_OWNER (0)
 
 typedef MARKER {
-    bool owns;
+    byte owner = DEFAULT_OWNER;
     int LN[N]
-}
+};
 
-mtype = { request, marker };
-chan ports [N] = [N] of { mtype, byte, int, chan };
+MARKER token;
+int cs_counts [N];
+byte at_cs = 0;
+chan requests [N] = [N] of { byte, int };
 // request(sender, n, _), where sender - sender's pid (j), n - RN_j[j]
 // marker(_, _, mbuf), where mbuf - buffer with the marker
 
-inline pass_marker(port, token, mbuf) {
-    mbuf ! token;
-    ports[port] ! marker(0, 0, mbuf)
+inline try_pass_marker(next_owner) {
+    atomic {
+        if
+        :: else -> skip
+        :: token.owner == _pid ->
+           token.owner = next_owner
+        fi
+    }
 }
 
-inline request_CS(token, mbuf, RN) {
+inline request_CS(RN) {
     byte j;
     int n;
-    mtype ingress_mtype;
     if
-    :: ! token.owns ->
-        RN[_pid]++;
-        for(other_pid, 0, N)
-            if
-            :: other_pid != _pid -> ports[other_pid] ! request(_pid, RN[_pid], SENTINEL_CHAN)
-            fi;
-        rof(other_pid)
+    :: else -> skip
+    :: token.owner != _pid ->
+       RN[_pid]++;
+       for(other_pid, 0, N)
+           if
+           :: else -> skip
+           :: other_pid != _pid ->
+              requests[other_pid] ! _pid, RN[_pid]
+           fi;
+       rof(other_pid)
     fi;
-    ports[_pid] ? ingress_mtype, j, n, mbuf;
     if
-    :: ingress_mtype == marker -> mbuf ? token
-    :: ingress_mtype == request ->
+    :: empty(requests[_pid]) -> skip
+    :: nempty(requests[_pid]) ->
+       requests[_pid] ? j, n;
        RN[j] = (RN[j] > n -> RN[j] : n);
        if
-       :: token.owns && RN[j] == token.LN[j] + 1 -> pass_marker(j, token, mbuf)
+       :: else -> skip
+       :: RN[j] == token.LN[j] + 1 ->
+          try_pass_marker(j)
        fi
     fi
 }
 
-inline enter_CS(token, cs_count) {
+inline enter_CS() {
     if
-    :: token.owns -> atomic { cs_count++ }
+    :: else -> skip
+    :: token.owner == _pid ->
+       at_cs++;
+       cs_counts[_pid]++;
+       assert (at_cs <= 1);
+       at_cs--
     fi
 }
 
-inline exit_CS(token, mbuf, RN, Q) {
+inline exit_CS(RN, Q) {
     byte next_pid;
     if
-    :: token.owns ->
+    :: else -> skip
+    :: token.owner == _pid ->
        token.LN[_pid] = RN[_pid];
        for (enqueue_pid, 0, N)
           if // random polling (typed [] for using as guard, usually <>)
           :: (Q ?? [eval(enqueue_pid)]) -> skip
           :: else ->
              if
+             :: else -> skip
              :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
                 Q ! enqueue_pid
              fi
           fi;
        rof(enqueue_pid);
        if
+       :: empty(Q) -> skip
        :: nempty(Q) ->
           Q ? next_pid;
-          pass_marker(next_pid, token, mbuf)
+          try_pass_marker(next_pid)
        fi
     fi
 }
 
-proctype P(bool owns) {
-    chan mbuf = [1] of { MARKER };
-    int cs_count = 0;
+active [N] proctype P() {
     int RN[N]; // local sequence numbers of last request
     chan Q = [N] of { byte }; // processes queue
-    MARKER token;
-    token.owns = owns;
-    for(i, 0, N)
-        token.LN[i] = 0;
-        RN[i] = 0;
-    rof(i);
+    cs_counts[_pid] = 0;
     do
-    :: request_CS(token, mbuf, RN);
-       enter_CS(token, cs_count);
-       exit_CS(token, mbuf, RN, Q)
+    :: request_CS(RN);
+       enter_CS();
+       exit_CS(RN, Q)
     od
 }
-
-init {
-    run P(false);
-    run P(true)
-}
-
