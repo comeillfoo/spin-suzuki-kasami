@@ -14,17 +14,16 @@
 #define DEFAULT_OWNER (0)
 
 typedef MARKER {
-    byte owner = DEFAULT_OWNER;
-    int LN[N]
+   byte owner = DEFAULT_OWNER;
+   int LN[N];
+   chan Q = [N] of { byte } // processes queue
 };
 
 MARKER token;
 int cs_counts [N];
 int cs_flags [N];
 byte at_cs = 0;
-chan requests [N] = [N] of { byte, int };
-// request(sender, n, _), where sender - sender's pid (j), n - RN_j[j]
-// marker(_, _, mbuf), where mbuf - buffer with the marker
+chan requests [N] = [N] of { byte, int }; // sender's pid (j), n - RN_j[j]
 
 inline try_pass_marker(next_owner) {
     atomic {
@@ -77,7 +76,7 @@ inline enter_CS() {
     fi
 }
 
-inline exit_CS(RN, Q) {
+inline exit_CS(RN) {
     byte next_pid;
     if
     :: else -> skip
@@ -85,19 +84,20 @@ inline exit_CS(RN, Q) {
        token.LN[_pid] = RN[_pid];
        for (enqueue_pid, 0, N)
           if // random polling (typed [] for using as guard, usually <>)
-          :: (Q ?? [eval(enqueue_pid)]) -> skip
+          :: (token.Q ?? [eval(enqueue_pid)]) -> skip
           :: else ->
              if
              :: else -> skip
              :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
-                Q ! enqueue_pid
+                token.Q ! enqueue_pid
              fi
           fi;
        rof(enqueue_pid);
        if
-       :: empty(Q) -> skip
-       :: nempty(Q) ->
-          Q ? next_pid;
+       :: empty(token.Q) -> skip
+       :: nempty(token.Q) ->
+          token.Q ? next_pid;
+          assert (RN[next_pid] == token.LN[next_pid] + 1);
           try_pass_marker(next_pid)
        fi
     fi
@@ -105,12 +105,11 @@ inline exit_CS(RN, Q) {
 
 active [N] proctype P() {
     int RN[N]; // local sequence numbers of last request
-    chan Q = [N] of { byte }; // processes queue
     cs_counts[_pid] = 0;
     do
     :: request_CS(RN);
        enter_CS();
-       exit_CS(RN, Q)
+       exit_CS(RN)
     od
 }
 
