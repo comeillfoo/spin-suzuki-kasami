@@ -13,7 +13,7 @@ help:
 pan: $(BUILDDIR)/pan.c
 	$(LD) -DNXT -o $@ $<
 
-$(BUILDDIR)/pan.c: $(SRCDIR)/main.pml $(BUILDDIR)
+$(BUILDDIR)/pan.c: $(SRCDIR)/proto.pml $(BUILDDIR)
 	cd $(BUILDDIR) && $(SPIN) -a ../$<
 
 $(BUILDDIR):
@@ -21,6 +21,6 @@ $(BUILDDIR):
 
 clean:
 	rm -rf $(BUILDDIR)
-	rm -f pan *.pml.trail
+	rm -f pan *.pml.trail pan.*
 
 .PHONY: clean help

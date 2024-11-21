@@ -3,5 +3,8 @@
 !/README.md
 !/LICENSE
 !/Makefile
+!/assets/diags
+!/assets
+!/src
 !*.pml
 !*.pu
