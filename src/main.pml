@@ -16,7 +16,7 @@
 typedef MARKER {
    byte owner = DEFAULT_OWNER;
    int LN[N];
-   chan Q = [N] of { byte } // processes queue
+   chan Q = [N + N / 2] of { byte } // processes queue
 };
 
 MARKER token;
@@ -115,3 +115,4 @@ active [N] proctype P() {
 
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_token_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
+ltl finite_nr_of_requests { [](len(token.Q) <= (N - 1)) }
