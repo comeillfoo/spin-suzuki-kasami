@@ -20,6 +20,7 @@ typedef MARKER {
 
 MARKER token;
 int cs_counts [N];
+int cs_flags [N];
 byte at_cs = 0;
 chan requests [N] = [N] of { byte, int };
 // request(sender, n, _), where sender - sender's pid (j), n - RN_j[j]
@@ -67,10 +68,12 @@ inline enter_CS() {
     if
     :: else -> skip
     :: token.owner == _pid ->
+       cs_flags[_pid] = true;
        at_cs++;
        cs_counts[_pid]++;
        assert (at_cs <= 1);
-       at_cs--
+       at_cs--;
+       cs_flags[_pid] = false
     fi
 }
 
@@ -110,3 +113,6 @@ active [N] proctype P() {
        exit_CS(RN, Q)
     od
 }
+
+ltl cs_prop { [](at_cs <= 1) }
+ltl only_token_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
