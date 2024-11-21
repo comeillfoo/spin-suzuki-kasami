@@ -116,3 +116,5 @@ active [N] proctype P() {
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_token_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
 ltl finite_nr_of_requests { [](len(token.Q) <= (N - 1)) }
+
+ltl liveness { <>(cs_counts[1] > 0) }
