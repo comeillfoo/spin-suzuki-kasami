@@ -19,13 +19,13 @@
 #define DEFAULT_OWNER (0)
 #endif
 
-typedef MARKER {
+typedef token_t {
    byte owner = DEFAULT_OWNER;
    int LN[N];
    chan Q = [N + N / 2] of { byte } // processes queue
 };
 
-MARKER token;
+token_t token;
 int cs_counts [N];
 int cs_flags [N];
 byte at_cs = 0;
