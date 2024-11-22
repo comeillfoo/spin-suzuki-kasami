@@ -10,8 +10,14 @@
     od
 
 // Number of nodes
+#ifndef N
 #define N (2)
+#endif
+
+// Default owner
+#ifndef DEFAULT_OWNER
 #define DEFAULT_OWNER (0)
+#endif
 
 typedef MARKER {
    byte owner = DEFAULT_OWNER;
