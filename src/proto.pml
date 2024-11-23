@@ -113,17 +113,17 @@ active [N] proctype P() {
 end:
     do
     :: if
-       :: empty(requests[_pid]) -> skip
        :: nempty(requests[_pid]) -> handle_requests(RN)
-       fi;
-       request_CS(RN);
-       enter_CS();
-       exit_CS(RN)
+       :: empty(requests[_pid]) ->
+          request_CS(RN);
+          enter_CS();
+          exit_CS(RN)
+       fi
     od
 }
 
 ltl cs_prop { [](at_cs <= 1) }
-ltl only_token_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
-ltl finite_nr_of_requests { [](len(token.Q) <= (N - 1)) }
+ltl only_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
+ltl finite_nr_requests { [](len(token.Q) <= (N - 1)) }
 
 ltl liveness { <>(cs_mask + 1 == (1 << N)) }
