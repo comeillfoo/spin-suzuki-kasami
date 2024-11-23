@@ -124,6 +124,7 @@ end:
 
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
-ltl finite_nr_requests { [](len(token.Q) <= (N - 1)) }
+ltl finite_token_queue { [](len(token.Q) <= (N - 1)) }
+// ltl finite_nr_requests { [](len(requests[token.owner]) <= (N - 1)) }
 
 ltl liveness { <>(cs_mask + 1 == (1 << N)) }
