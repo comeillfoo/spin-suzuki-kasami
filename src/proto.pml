@@ -98,7 +98,7 @@ inline exit_CS() {
           if // random polling (typed [] for using as guard, usually <>)
           :: enqueue_pid == cpid || (token.Q ?? [eval(enqueue_pid)]) -> skip
           :: else ->
-             if // changed this because SPIN causes other processes to starve
+             if
              :: pstates[cpid].RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
                 token.Q ! enqueue_pid
              :: else -> skip
@@ -109,7 +109,6 @@ inline exit_CS() {
        :: empty(token.Q) -> skip
        :: nempty(token.Q) ->
           token.Q ? next_pid;
-          // changed this because SPIN causes other processes to starve
           assert (pstates[cpid].RN[next_pid] == token.LN[next_pid] + 1);
           try_pass_marker(next_pid)
        fi
