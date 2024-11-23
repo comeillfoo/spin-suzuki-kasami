@@ -19,6 +19,13 @@
 #define DEFAULT_OWNER (1)
 #endif
 
+typedef procstate_t {
+   int RN[N] // local sequence numbers of last request
+};
+
+procstate_t pstates[N];
+byte cpid = 0;
+
 typedef token_t {
    byte owner = DEFAULT_OWNER;
    int LN[N];
@@ -35,34 +42,34 @@ inline try_pass_marker(next_owner) {
     atomic {
         if
         :: else -> skip
-        :: token.owner == _pid ->
+        :: token.owner == cpid ->
            token.owner = next_owner
         fi
     }
 }
 
-inline handle_requests(RN) {
+inline handle_requests() {
     byte j;
     int n;
-    requests[_pid] ? j, n;
-    RN[j] = (RN[j] > n -> RN[j] : n);
+    requests[cpid] ? j, n;
+    pstates[cpid].RN[j] = (pstates[cpid].RN[j] > n -> pstates[cpid].RN[j] : n);
     if
     :: else -> skip
-    :: RN[j] == token.LN[j] + 1 ->
+    :: pstates[cpid].RN[j] == token.LN[j] + 1 ->
        try_pass_marker(j)
     fi
 }
 
-inline request_CS(RN) {
+inline request_CS() {
     if
     :: else -> skip
-    :: token.owner != _pid ->
-       RN[_pid]++;
+    :: token.owner != cpid ->
+       pstates[cpid].RN[cpid]++;
        for(other_pid, 0, N)
            if
            :: else -> skip
-           :: other_pid != _pid ->
-              requests[other_pid] ! _pid, RN[_pid]
+           :: other_pid != cpid ->
+              requests[other_pid] ! cpid, pstates[cpid].RN[cpid]
            fi;
        rof(other_pid)
     fi
@@ -70,28 +77,29 @@ inline request_CS(RN) {
 
 inline enter_CS() {
     if
-    :: token.owner == _pid ->
-       cs_flags[_pid] = true;
+    :: else -> skip
+    :: token.owner == cpid ->
+       cs_flags[cpid] = true;
        at_cs++;
-       cs_mask = cs_mask | (1 << _pid);
+       cs_mask = cs_mask | (1 << cpid);
        assert (at_cs <= 1);
        at_cs--;
-       cs_flags[_pid] = false
+       cs_flags[cpid] = false
     fi
 }
 
-inline exit_CS(RN) {
+inline exit_CS() {
     byte next_pid;
     if
     :: else -> skip
-    :: token.owner == _pid ->
-       token.LN[_pid] = RN[_pid];
+    :: token.owner == cpid ->
+       token.LN[cpid] = pstates[cpid].RN[cpid];
        for (enqueue_pid, 0, N)
           if // random polling (typed [] for using as guard, usually <>)
-          :: enqueue_pid == _pid || (token.Q ?? [eval(enqueue_pid)]) -> skip
+          :: enqueue_pid == cpid || (token.Q ?? [eval(enqueue_pid)]) -> skip
           :: else ->
              if // changed this because SPIN causes other processes to starve
-             :: RN[enqueue_pid] <= token.LN[enqueue_pid] + 1 ->
+             :: pstates[cpid].RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
                 token.Q ! enqueue_pid
              :: else -> skip
              fi
@@ -102,29 +110,29 @@ inline exit_CS(RN) {
        :: nempty(token.Q) ->
           token.Q ? next_pid;
           // changed this because SPIN causes other processes to starve
-          assert (RN[next_pid] <= token.LN[next_pid] + 1);
+          assert (pstates[cpid].RN[next_pid] == token.LN[next_pid] + 1);
           try_pass_marker(next_pid)
        fi
     fi
 }
 
-active [N] proctype P() {
-    int RN[N]; // local sequence numbers of last request
+active proctype Protocol() {
 end:
     do
     :: if
-       :: nempty(requests[_pid]) -> handle_requests(RN)
-       :: empty(requests[_pid]) ->
-          request_CS(RN);
+       :: nempty(requests[cpid]) -> handle_requests()
+       :: empty(requests[cpid]) ->
+          request_CS();
           enter_CS();
-          exit_CS(RN)
-       fi
+          exit_CS()
+       fi;
+       cpid = (cpid + 1) % N // dispatch next process
     od
 }
 
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
 ltl finite_token_queue { [](len(token.Q) <= (N - 1)) }
-// ltl finite_nr_requests { [](len(requests[token.owner]) <= (N - 1)) }
+ltl finite_nr_requests { [](len(requests[token.owner]) <= (N - 1)) }
 
 ltl liveness { <>(cs_mask + 1 == (1 << N)) }
