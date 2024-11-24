@@ -10,9 +10,6 @@ BUILDDIR='build'
 # @brief source directory
 SRCDIR='src'
 
-# @brief N
-N="${1:-2}"
-
 # @brief path to verifier
 PAN='./pan'
 
@@ -63,6 +60,39 @@ build_pan()
     gcc -DNXT -o pan "${BUILDDIR}/pan.c"
 }
 
+usage()
+{
+    cat <<EOF
+Usage: ${0##*/} [options] N
+
+Options:
+    -h, --help    Prints this help message
+    -v, --verbose Increases verbosity level
+EOF
+    exit 22 # EINVAL: Invalid argument
+}
+
+# @brief should be verbose
+verbose=false
+while true; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -v|--verbose)
+            verbose=true
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+[ $# -lt 1 ] && usage
+
+# @brief N
+N="${1:-2}"
 set -euo pipefail
 
 echo 'TAP version 14'
@@ -78,8 +108,10 @@ for default_owner in $(seq 0 $((N - 1))); do
         exit 1
     fi
     for expr in "${EXPRS[@]}"; do
-        nr_errors=$("${PAN}" -a -N "${expr}" | grep -Eo 'errors: [0-9]+' \
+        output=$("${PAN}" -a -N "${expr}")
+        nr_errors=$(echo "${output}" | grep -Eo 'errors: [0-9]+' \
             | cut -d' ' -f2)
+        "${verbose}" && echo "${output}" |& awk '$0="# "$0' -
         if [ "${nr_errors}" -gt 0 ]; then
             test_rc=1
             RC=1
