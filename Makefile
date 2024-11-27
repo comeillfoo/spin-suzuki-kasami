@@ -2,6 +2,8 @@ CC=gcc
 LD=gcc
 SPIN=spin
 
+USERCFLAGS=
+
 SRCDIR=src
 BUILDDIR=build
 
@@ -14,7 +16,7 @@ pan: $(BUILDDIR)/pan.c
 	$(LD) -DNXT -o $@ $<
 
 $(BUILDDIR)/pan.c: $(SRCDIR)/proto.pml $(BUILDDIR)
-	cd $(BUILDDIR) && $(SPIN) -a ../$<
+	cd $(BUILDDIR) && $(SPIN) -a $(USERCFLAGS) ../$<
 
 $(BUILDDIR):
 	mkdir -p $@
@@ -23,4 +25,7 @@ clean:
 	rm -rf $(BUILDDIR)
 	rm -f pan *.pml.trail pan.*
 
-.PHONY: clean help
+test:
+	@for i in $$(seq 2 5); do ./test.sh $$i; done
+
+.PHONY: clean help test
