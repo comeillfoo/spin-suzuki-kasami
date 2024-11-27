@@ -10,7 +10,14 @@ BUILDDIR=build
 all: pan
 
 help:
-	@echo 'TODO: help message'
+	@echo 'Targets:'
+	@echo
+	@echo 'help    - prints this help message'
+	@echo 'pan     - builds verifier'
+	@echo 'default - builds verifier'
+	@echo 'clean   - deletes build files and verifier'
+	@echo 'test    - runs tests'
+
 
 pan: $(BUILDDIR)/pan.c
 	$(LD) -DNXT -o $@ $<
