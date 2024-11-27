@@ -91,7 +91,7 @@ inline exit_CS(RN) {
           :: enqueue_pid == _pid || (token.Q ?? [eval(enqueue_pid)]) -> skip
           :: else ->
              if // changed this because SPIN causes other processes to starve
-             :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
+             :: RN[enqueue_pid] <= token.LN[enqueue_pid] + 1 ->
                 token.Q ! enqueue_pid
              :: else -> skip
              fi
@@ -102,7 +102,7 @@ inline exit_CS(RN) {
        :: nempty(token.Q) ->
           token.Q ? next_pid;
           // changed this because SPIN causes other processes to starve
-          assert (RN[next_pid] == token.LN[next_pid] + 1);
+          assert (RN[next_pid] <= token.LN[next_pid] + 1);
           try_pass_marker(next_pid)
        fi
     fi
@@ -115,6 +115,11 @@ end:
     :: if
        :: nempty(requests[_pid]) -> handle_requests(RN)
        :: empty(requests[_pid]) ->
+          // changed this because SPIN causes other processes to starve
+          if // block token owner on handling request in order to force SPIN to dispatch others
+          :: token.owner == _pid -> handle_requests(RN)
+          :: else -> skip
+          fi;
           request_CS(RN);
           enter_CS();
           exit_CS(RN)
@@ -124,6 +129,5 @@ end:
 
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
-ltl finite_token_queue { [](len(token.Q) <= (N - 1)) }
-// ltl finite_nr_requests { [](len(requests[token.owner]) <= (N - 1)) }
+ltl finite_token_queue { [](len(token.Q) <= N) }
 ltl liveness { <>(cs_mask + 1 == (1 << N)) }

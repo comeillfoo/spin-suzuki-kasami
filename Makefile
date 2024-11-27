@@ -26,6 +26,6 @@ clean:
 	rm -f pan *.pml.trail pan.*
 
 test:
-	@for i in $$(seq 2 5); do ./test.sh $$i; done
+	@for i in $$(seq 5 -1 2); do ./test.sh $$i; done
 
 .PHONY: clean help test
