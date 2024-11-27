@@ -2,6 +2,8 @@ CC=gcc
 LD=gcc
 SPIN=spin
 
+USERCFLAGS=
+
 SRCDIR=src
 BUILDDIR=build
 
@@ -21,7 +23,7 @@ pan: $(BUILDDIR)/pan.c
 	$(LD) -DNXT -o $@ $<
 
 $(BUILDDIR)/pan.c: $(SRCDIR)/proto.pml $(BUILDDIR)
-	cd $(BUILDDIR) && $(SPIN) -a ../$<
+	cd $(BUILDDIR) && $(SPIN) -a $(USERCFLAGS) ../$<
 
 $(BUILDDIR):
 	mkdir -p $@
