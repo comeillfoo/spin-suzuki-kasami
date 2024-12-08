@@ -29,6 +29,7 @@ token_t token;
 int cs_flags [N];
 byte at_cs = 0;
 int cs_mask = 0;
+int ask_mask = 0;
 chan requests [N] = [N] of { byte, int }; // sender's pid (j), n - RN_j[j]
 
 inline try_pass_marker(next_owner) {
@@ -54,6 +55,7 @@ inline handle_requests(RN) {
 }
 
 inline request_CS(RN) {
+    ask_mask = ask_mask | (1 << _pid);
     if
     :: else -> skip
     :: token.owner != _pid ->
@@ -70,6 +72,7 @@ inline request_CS(RN) {
 
 inline enter_CS() {
     if
+    :: else -> skip
     :: token.owner == _pid ->
        cs_flags[_pid] = true;
        at_cs++;
@@ -90,8 +93,8 @@ inline exit_CS(RN) {
           if // random polling (typed [] for using as guard, usually <>)
           :: enqueue_pid == _pid || (token.Q ?? [eval(enqueue_pid)]) -> skip
           :: else ->
-             if // changed this because SPIN causes other processes to starve
-             :: RN[enqueue_pid] <= token.LN[enqueue_pid] + 1 ->
+             if
+             :: RN[enqueue_pid] == token.LN[enqueue_pid] + 1 ->
                 token.Q ! enqueue_pid
              :: else -> skip
              fi
@@ -101,8 +104,7 @@ inline exit_CS(RN) {
        :: empty(token.Q) -> skip
        :: nempty(token.Q) ->
           token.Q ? next_pid;
-          // changed this because SPIN causes other processes to starve
-          assert (RN[next_pid] <= token.LN[next_pid] + 1);
+          assert (RN[next_pid] == token.LN[next_pid] + 1);
           try_pass_marker(next_pid)
        fi
     fi
@@ -115,19 +117,22 @@ end:
     :: if
        :: nempty(requests[_pid]) -> handle_requests(RN)
        :: empty(requests[_pid]) ->
-          // changed this because SPIN causes other processes to starve
-          if // block token owner on handling request in order to force SPIN to dispatch others
-          :: token.owner == _pid -> handle_requests(RN)
-          :: else -> skip
-          fi;
-          request_CS(RN);
-          enter_CS();
-          exit_CS(RN)
+         //  if // block token owner on handling request in order to force SPIN to dispatch others
+         //  :: token.owner == _pid -> handle_requests(RN)
+         //  :: else -> skip
+         //  fi;
+          if // equiprobably request or not request for token
+          :: true ->
+             request_CS(RN);
+             enter_CS();
+             exit_CS(RN)
+          :: true -> skip
+          fi
        fi
     od
 }
 
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
-ltl finite_token_queue { [](len(token.Q) <= N) }
-ltl liveness { <>(cs_mask + 1 == (1 << N)) }
+ltl finite_token_queue { [](len(token.Q) <= (N - 1)) }
+ltl liveness { <>(cs_mask == ask_mask) }
