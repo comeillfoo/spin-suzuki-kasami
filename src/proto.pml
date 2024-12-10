@@ -112,17 +112,12 @@ inline exit_CS(RN) {
 
 active [N] proctype P() {
     int RN[N]; // local sequence numbers of last request
-end:
     do
     :: if
        :: nempty(requests[_pid]) -> handle_requests(RN)
        :: empty(requests[_pid]) ->
-         //  if // block token owner on handling request in order to force SPIN to dispatch others
-         //  :: token.owner == _pid -> handle_requests(RN)
-         //  :: else -> skip
-         //  fi;
-          if // equiprobably request or not request for token
-          :: true ->
+          if // randomly participate in protocol if never been in critical section
+          :: (cs_mask >> _pid) & 1 == 0 ->
              request_CS(RN);
              enter_CS();
              exit_CS(RN)
@@ -135,4 +130,4 @@ end:
 ltl cs_prop { [](at_cs <= 1) }
 ltl only_owner_in_cs { []((at_cs == 1) -> cs_flags[token.owner]) }
 ltl finite_token_queue { [](len(token.Q) <= (N - 1)) }
-ltl liveness { <>(cs_mask == ask_mask) }
+ltl liveness { []((ask_mask > 0) -> <>(cs_mask == ask_mask)) }

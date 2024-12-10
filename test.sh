@@ -66,21 +66,14 @@ Usage: ${0##*/} [options] N
 
 Options:
     -h, --help    Prints this help message
-    -v, --verbose Increases verbosity level
 EOF
     exit 22 # EINVAL: Invalid argument
 }
 
-# @brief should be verbose
-verbose=false
 while true; do
     case $1 in
         -h|--help)
             usage
-            ;;
-        -v|--verbose)
-            verbose=true
-            shift
             ;;
         *)
             break
@@ -107,16 +100,7 @@ for default_owner in $(seq 0 $((N - 1))); do
         exit 1
     fi
     for expr in "${EXPRS[@]}"; do
-        logfile=$(mktemp -ut "test_${expr}_${N}-${default_owner}.XXXXXX.log")
-        "${PAN}" -a -N "${expr}" &> "${logfile}" &
-        pan_pid=$!
-        sleep 3s
-        if [ -d "/proc/${pan_pid}" ]; then
-            kill -INT "${pan_pid}"
-        fi
-        nr_errors=$(grep -Eo 'errors: [0-9]+' "${logfile}" \
-            | cut -d' ' -f2)
-        "${verbose}" && echo "${output}" |& awk '$0="# "$0' -
+        nr_errors=$("${PAN}" -a -N "${expr}" | grep -Eo 'errors: [0-9]+' - | cut -d' ' -f2)
         if [ "${nr_errors}" -gt 0 ]; then
             test_rc=1
             RC=1
